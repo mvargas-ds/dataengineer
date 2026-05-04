@@ -1,0 +1,46 @@
+# ===========================================
+# Data Engineer Pipeline - Requirements
+# ===========================================
+
+# ETL Dependencies
+pandas>=2.0.0
+openpyxl>=3.1.0
+xlrd>=2.0.1
+pyarrow>=14.0.0
+
+# Database
+duckdb>=0.9.0
+sqlalchemy>=1.4.0,<2.0.0
+
+# Cloud (opcional - descomenta si necesitas)
+snowflake-connector-python>=3.0.0
+snowflake-sqlalchemy>=1.5.0
+# google-cloud-storage>=2.10.0
+# azure-storage-blob>=12.19.0
+# apache-beam[gcp]>=2.50.0
+
+# Analytics Chatbot (IA)
+openai>=1.0.0
+anthropic>=0.20.0
+
+# Dashboard
+streamlit>=1.30.0
+plotly>=5.18.0
+
+# API REST
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+loguru>=0.7.0
+click>=8.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Jupyter (opcional)
+jupyter>=1.0.0
+ipykernel>=6.29.0

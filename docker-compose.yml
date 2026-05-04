@@ -1,0 +1,239 @@
+# =============================================================================
+# Docker Compose for the Data Engineering environment
+# =============================================================================
+# Includes:
+# - Containerized ETL Pipeline
+# - Airflow (webserver, scheduler, worker)
+# - PostgreSQL for Airflow
+# - Redis for Celery
+#
+# Usage:
+#   docker-compose up -d                    # Start all services
+#   docker-compose up pipeline              # Only run the pipeline
+#   docker-compose up airflow-webserver     # Only Airflow
+#   docker-compose logs -f                  # View logs
+#   docker-compose down                     # Stop services
+# =============================================================================
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_ENGINE_OPTIONS: '{"pool_pre_ping": true}'
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    # Pipeline variables
+    SNOWFLAKE_ACCOUNT: ${SNOWFLAKE_ACCOUNT:-}
+    SNOWFLAKE_USER: ${SNOWFLAKE_USER:-}
+    SNOWFLAKE_PASSWORD: ${SNOWFLAKE_PASSWORD:-}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+    GCP_BUCKET_NAME: ${GCP_BUCKET_NAME:-}
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./src:/opt/airflow/dags/dataengineer/src
+    - ./raw_data:/opt/airflow/dags/dataengineer/raw_data
+    - ./data:/opt/airflow/data
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+services:
+  # =========================================================================
+  # Containerized ETL Pipeline
+  # =========================================================================
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dataengineer-pipeline
+    environment:
+      - TARGET=${TARGET:-duckdb}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOCAL_DB_PATH=/app/data/warehouse.duckdb
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - dataengineer-network
+    profiles:
+      - pipeline
+
+  # =========================================================================
+  # PostgreSQL Database for Airflow
+  # =========================================================================
+  postgres:
+    image: postgres:15
+    container_name: dataengineer-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Redis for Celery (Airflow)
+  # =========================================================================
+  redis:
+    image: redis:7
+    container_name: dataengineer-redis
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Airflow Webserver
+  # =========================================================================
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: dataengineer-airflow-webserver
+    command: webserver
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Airflow Scheduler
+  # =========================================================================
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: dataengineer-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Airflow Worker (Celery)
+  # =========================================================================
+  airflow-worker:
+    <<: *airflow-common
+    container_name: dataengineer-airflow-worker
+    command: celery worker
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Airflow Triggerer
+  # =========================================================================
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: dataengineer-airflow-triggerer
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+  # =========================================================================
+  # Airflow Initialization
+  # =========================================================================
+  airflow-init:
+    <<: *airflow-common
+    container_name: dataengineer-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        chown -R "${AIRFLOW_UID:-50000}:0" /sources/{logs,dags,plugins}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin}
+    user: "0:0"
+    volumes:
+      - ./airflow:/sources
+    networks:
+      - dataengineer-network
+    profiles:
+      - airflow
+
+# =============================================================================
+# Persistent Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    name: dataengineer-postgres-data
+
+# =============================================================================
+# Docker Network
+# =============================================================================
+networks:
+  dataengineer-network:
+    name: dataengineer-network
+    driver: bridge
+

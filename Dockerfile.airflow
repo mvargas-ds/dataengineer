@@ -1,0 +1,26 @@
+# =============================================================================
+# Dockerfile para Airflow con dependencias del pipeline
+# =============================================================================
+FROM apache/airflow:2.7.3-python3.11
+
+USER root
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+# Copiar e instalar dependencias de Python
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Copiar código fuente del pipeline
+COPY --chown=airflow:root src/ /opt/airflow/dags/dataengineer/src/
+
+# Variables de entorno
+ENV PYTHONPATH="${PYTHONPATH}:/opt/airflow/dags/dataengineer"
+

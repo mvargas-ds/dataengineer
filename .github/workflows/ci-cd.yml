@@ -1,0 +1,277 @@
+# =============================================================================
+# GitHub Actions - CI/CD Pipeline
+# =============================================================================
+# Este workflow implementa integración y despliegue continuo:
+# 1. Ejecuta tests y linting en cada PR
+# 2. Construye y publica imagen Docker
+# 3. Despliega a Azure Container Instances
+# 4. Actualiza el entorno de Airflow
+#
+# Similar al proyecto ePlan descrito en los requisitos.
+# =============================================================================
+
+name: Data Engineering CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Target de despliegue'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ===========================================================================
+  # Job: Linting y Validación de Código
+  # ===========================================================================
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Instalar dependencias de desarrollo
+        run: |
+          pip install --upgrade pip
+          pip install black flake8 mypy isort
+
+      - name: Ejecutar black (formato)
+        run: black --check src/ airflow/
+
+      - name: Ejecutar flake8 (linting)
+        run: flake8 src/ airflow/ --max-line-length=100 --ignore=E501,W503
+
+      - name: Ejecutar isort (imports)
+        run: isort --check-only src/ airflow/
+
+  # ===========================================================================
+  # Job: Tests Unitarios
+  # ===========================================================================
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock
+
+      - name: Ejecutar tests
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
+
+      - name: Subir reporte de cobertura
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+
+  # ===========================================================================
+  # Job: Validación del DAG de Airflow
+  # ===========================================================================
+  validate-dag:
+    name: Validate Airflow DAG
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Instalar Airflow
+        run: |
+          pip install apache-airflow==2.7.3 \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-3.11.txt"
+          pip install -r requirements.txt
+
+      - name: Validar sintaxis del DAG
+        run: |
+          export AIRFLOW_HOME=$(pwd)/airflow
+          airflow db init
+          python -c "from airflow.models import DagBag; db = DagBag('./airflow/dags', include_examples=False); assert len(db.import_errors) == 0, db.import_errors"
+
+  # ===========================================================================
+  # Job: Construir Imagen Docker
+  # ===========================================================================
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, validate-dag]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extraer metadata de Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Construir y publicar imagen
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===========================================================================
+  # Job: Desplegar a Azure Container Instances
+  # ===========================================================================
+  deploy-azure:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment:
+      name: production
+      url: https://portal.azure.com
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login a Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Desplegar Container Instance
+        uses: azure/aci-deploy@v1
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          dns-name-label: dataengineer-pipeline
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          name: dataengineer-pipeline
+          location: 'westeurope'
+          cpu: 2
+          memory: 4
+          registry-login-server: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          environment-variables: |
+            TARGET=snowflake
+            LOG_LEVEL=INFO
+          secure-environment-variables: |
+            SNOWFLAKE_ACCOUNT=${{ secrets.SNOWFLAKE_ACCOUNT }}
+            SNOWFLAKE_USER=${{ secrets.SNOWFLAKE_USER }}
+            SNOWFLAKE_PASSWORD=${{ secrets.SNOWFLAKE_PASSWORD }}
+
+      - name: Notificar despliegue exitoso
+        uses: slackapi/slack-github-action@v1.24.0
+        if: success()
+        with:
+          channel-id: 'deployments'
+          slack-message: '✅ Pipeline desplegado exitosamente en Azure'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  # ===========================================================================
+  # Job: Actualizar Airflow en GCP
+  # ===========================================================================
+  update-airflow:
+    name: Update Airflow DAGs
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Autenticar con GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configurar gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Subir DAGs a Cloud Storage
+        run: |
+          gsutil -m cp -r airflow/dags/* gs://${{ secrets.GCS_BUCKET }}/dags/
+
+      - name: Verificar actualización
+        run: |
+          echo "DAGs actualizados en gs://${{ secrets.GCS_BUCKET }}/dags/"
+          gsutil ls gs://${{ secrets.GCS_BUCKET }}/dags/
+
+  # ===========================================================================
+  # Job: Ejecutar Pipeline Manualmente
+  # ===========================================================================
+  run-pipeline:
+    name: Run Pipeline (Manual)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    steps:
+      - name: Ejecutar pipeline en Azure Container Instance
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Trigger pipeline execution
+        run: |
+          az container start \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name dataengineer-pipeline
+          
+          echo "Pipeline iniciado. Verificar logs en Azure Portal."
+
