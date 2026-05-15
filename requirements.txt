@@ -12,19 +12,37 @@ pyarrow>=14.0.0
 duckdb>=0.9.0
 sqlalchemy>=1.4.0,<2.0.0
 
-# Cloud (opcional - descomenta si necesitas)
+# Cloud - Snowflake (Production)
 snowflake-connector-python>=3.0.0
 snowflake-sqlalchemy>=1.5.0
 # google-cloud-storage>=2.10.0
 # azure-storage-blob>=12.19.0
-# apache-beam[gcp]>=2.50.0
 
-# Analytics Chatbot (IA)
+# ===========================================
+# LangChain & LangGraph (AI Agent)
+# ===========================================
+langchain>=0.2.0
+langgraph>=0.1.0
+langchain-community>=0.2.0
+langchain-groq>=0.1.0
+groq>=0.5.0
+
+# Agent Tools
+tavily-python>=0.3.0          # Web search
+scholarly>=1.7.0              # Google Scholar
+beautifulsoup4>=4.12.0        # Web scraping
+httpx>=0.25.0                 # HTTP client
+requests>=2.31.0
+
+# Vector Store (for document retrieval)
+# chromadb>=0.4.0
+# sentence-transformers>=2.2.0
+
+# ===========================================
+# Analytics & Chatbot
+# ===========================================
 openai>=1.0.0
 anthropic>=0.20.0
-
-# Dashboard
-streamlit>=1.30.0
 plotly>=5.18.0
 
 # API REST
@@ -41,6 +59,7 @@ click>=8.1.0
 pytest>=7.4.0
 pytest-cov>=4.1.0
 
-# Jupyter (opcional)
+# Jupyter (optional)
 jupyter>=1.0.0
 ipykernel>=6.29.0
+

@@ -1,345 +1,457 @@
-# 🇪🇸 Data Engineering Pipeline - Datos de España
+# 🇪🇸 Data Engineering Pipeline - Spain Data
 
-Pipeline de Data Engineering para extracción, transformación y carga (ETL) de datos demográficos, económicos e industriales de España.
+Data Engineering pipeline for extraction, transformation, and loading (ETL) of demographic, economic, and industrial data from Spain, with **AI-powered analysis** using LangGraph + Groq.
 
-## 📋 Descripción
+## 📋 Description
 
-Este proyecto implementa una arquitectura moderna de Data Engineering similar a pipelines de producción:
+This project implements a modern Data Engineering architecture similar to production pipelines:
 
-- **Extracción**: Datos de despoblamiento, población por municipio e industria por provincia
-- **Transformación**: Limpieza, normalización y enriquecimiento de datos
-- **Carga**: Data Warehouse local (DuckDB) o cloud (Snowflake)
-- **AI/ML Ready**: Exportación a formato Vertex AI Datastore
-- **Desarrollo asistido por IA**: GitHub Copilot para generación de código y consultas
+- **Extraction**: Depopulation, population by municipality, and industry data by province
+- **Transformation**: Data cleaning, normalization, and enrichment
+- **Loading**: Local Data Warehouse (DuckDB) or Cloud (Snowflake)
+- **AI Agent**: LangGraph-powered conversational agent for depopulation analysis
+- **AI-Assisted Development**: GitHub Copilot for code generation and queries
 
-## 🏗️ Arquitectura
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          FUENTES DE DATOS                               │
-├────────────────┬────────────────────┬───────────────────────────────────┤
-│  Despoblamiento│     Población      │            Industria              │
-│    (4 CSV)     │   por Municipio    │         por Provincia             │
-│                │    (52 CSV)        │          (44 Excel)               │
-└───────┬────────┴─────────┬──────────┴──────────────┬────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DATA SOURCES                                    │
+├────────────────┬────────────────────┬───────────────────────────────────────┤
+│  Depopulation  │     Population     │              Industry                  │
+│    (4 CSV)     │   by Municipality  │            by Province                 │
+│                │     (52 CSV)       │           (44 Excel)                   │
+└───────┬────────┴─────────┬──────────┴──────────────┬────────────────────────┘
         │                  │                         │
         ▼                  ▼                         ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        EXTRACCIÓN (Python)                              │
-│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────────┐ │
-│  │DespoblamientoExt.│ │  PoblacionExt.   │ │     IndustriaExt.        │ │
-│  └──────────────────┘ └──────────────────┘ └──────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          EXTRACTION (Python)                                 │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────────────┐ │
+│  │DepopulationExt.  │ │  PopulationExt.  │ │      IndustryExt.            │ │
+│  └──────────────────┘ └──────────────────┘ └──────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      TRANSFORMACIÓN (Python/Pandas)                     │
-│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────────┐ │
-│  │ Limpieza Datos   │ │  Normalización   │ │  Enriquecimiento         │ │
-│  │ Validación       │ │  Estandarización │ │  Métricas Derivadas      │ │
-│  └──────────────────┘ └──────────────────┘ └──────────────────────────┘ │
-└───────────────────────────────┬─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      TRANSFORMATION (Python/Pandas)                          │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────────────┐ │
+│  │ Data Cleaning    │ │  Normalization   │ │  Enrichment                  │ │
+│  │ Validation       │ │  Standardization │ │  Derived Metrics             │ │
+│  └──────────────────┘ └──────────────────┘ └──────────────────────────────┘ │
+└───────────────────────────────┬─────────────────────────────────────────────┘
                                 │
             ┌───────────────────┼───────────────────┐
             ▼                   ▼                   ▼
-┌───────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
-│   DuckDB (Local)  │ │    Snowflake    │ │   GCP (Vertex AI Datastore) │
-│   Data Warehouse  │ │  (Producción)   │ │      Para AI/ML             │
-└───────────────────┘ └─────────────────┘ └─────────────────────────────┘
+┌───────────────────┐ ┌─────────────────┐ ┌─────────────────────────────────┐
+│   DuckDB (Local)  │ │    Snowflake    │ │   GCP (Vertex AI Datastore)     │
+│   Data Warehouse  │ │  (Production)   │ │      For AI/ML                  │
+└───────────────────┘ └────────┬────────┘ └─────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     🤖 AI AGENT (LangGraph + Groq)                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                       Router Node                                    │   │
+│  │              Analyzes question type and routes to tools              │   │
+│  └───────────────────────────┬─────────────────────────────────────────┘   │
+│                              │                                              │
+│    ┌─────────────┬───────────┼───────────┬────────────────┐                │
+│    ▼             ▼           ▼           ▼                ▼                │
+│ ┌──────┐   ┌──────────┐ ┌──────────┐ ┌──────────┐  ┌──────────────┐       │
+│ │ SQL  │   │   INE    │ │   Web    │ │ Scholar  │  │  Analysis    │       │
+│ │ Tool │   │   Tool   │ │  Search  │ │   Tool   │  │    Tool      │       │
+│ └──────┘   └──────────┘ └──────────┘ └──────────┘  └──────────────┘       │
+│                     │                                                       │
+│                     ▼                                                       │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │               Synthesis Node (Groq LLM - Llama/Qwen)                │   │
+│  │                 Combines results + Expert insights                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    ▼                       ▼
+          ┌─────────────────┐ ┌─────────────────────────────────┐
+          │   FastAPI REST  │ │     Command Line Interface      │
+          │  localhost:8000 │ │        python -m ...            │
+          └─────────────────┘ └─────────────────────────────────┘
 
-                    ORQUESTACIÓN: Apache Airflow
-                    CONTAINERIZACIÓN: Docker
-                    ASISTENTE IA: GitHub Copilot
+                    ORCHESTRATION: Apache Airflow
+                    CONTAINERIZATION: Docker
+                    AI ASSISTANT: GitHub Copilot
 ```
 
-## 📁 Estructura del Proyecto
+## 📁 Project Structure
 
 ```
 dataengineer/
-├── 📂 src/                          # Código fuente
-│   ├── 📂 config/                   # Configuración
+├── 📂 src/                              # Source code
+│   ├── 📂 config/                       # Configuration
 │   │   ├── __init__.py
-│   │   └── settings.py              # Variables de entorno y constantes
-│   ├── 📂 etl/                      # Pipeline ETL
+│   │   └── settings.py                  # Environment variables and constants
+│   ├── 📂 etl/                          # ETL Pipeline
 │   │   ├── __init__.py
-│   │   ├── extractors.py            # Extractores de datos
-│   │   ├── transformers.py          # Transformadores
-│   │   └── loaders.py               # Cargadores (DuckDB, Snowflake, GCS)
-│   ├── 📂 pipeline/                 # Orquestación
+│   │   ├── extractors.py                # Data extractors
+│   │   ├── transformers.py              # Transformers
+│   │   └── loaders.py                   # Loaders (DuckDB, Snowflake, GCS)
+│   ├── 📂 pipeline/                     # Orchestration
 │   │   ├── __init__.py
-│   │   └── main.py                  # Pipeline principal
-│   ├── 📂 analytics/                # Herramientas de análisis
-│   │   └── chatbot.py               # Chatbot Text-to-SQL
-│   ├── 📂 dashboard/                # Dashboard Streamlit
-│   │   └── app.py
-│   └── 📂 api/                      # API REST FastAPI
+│   │   └── main.py                      # Main pipeline
+│   ├── 📂 analytics/                    # Analysis tools
+│   │   ├── chatbot.py                   # Text-to-SQL chatbot
+│   │   └── 📂 agents/                   # 🤖 AI Agent System
+│   │       ├── __init__.py
+│   │       ├── depopulation_agent.py    # Main agent orchestrator
+│   │       ├── graph.py                 # LangGraph workflow definition
+│   │       ├── 📂 tools/                # Agent tools
+│   │       │   ├── snowflake_tool.py    # SQL queries to Snowflake
+│   │       │   ├── ine_tool.py          # INE official statistics API
+│   │       │   ├── web_search_tool.py   # Web + academic search
+│   │       │   └── analysis_tool.py     # Expert analysis tool
+│   │       ├── 📂 prompts/              # LLM prompts
+│   │       │   └── expert_prompts.py    # Domain expert prompts
+│       └── 📂 memory/               # Conversation memory
+│           └── conversation.py      # Memory management
+│   └── 📂 api/                          # REST API (FastAPI)
 │       └── main.py
-├── 📂 airflow/                      # Apache Airflow
+├── 📂 airflow/                          # Apache Airflow
 │   ├── 📂 dags/
-│   │   └── spain_data_pipeline_dag.py  # DAG de orquestación
-│   ├── 📂 logs/                     # Logs de Airflow
-│   └── 📂 plugins/                  # Plugins personalizados
-├── 📂 tests/                        # Tests unitarios
+│   │   └── spain_data_pipeline_dag.py   # Orchestration DAG
+│   ├── 📂 logs/                         # Airflow logs
+│   └── 📂 plugins/                      # Custom plugins
+├── 📂 tests/                            # Unit tests
 │   ├── __init__.py
 │   └── test_pipeline.py
-├── 📂 data/                         # Datos procesados (generado)
-│   └── warehouse.duckdb             # Base de datos DuckDB
-docker-compose --profile airflow down -v├── 📂 raw_data/                     # Fuentes de datos crudos
-│   ├── 📂 despoblamiento/           # Datos de despoblamiento (4 CSV)
-│   ├── 📂 industria/                # Datos de industria (44 Excel)
-│   └── 📂 pob_x_munic_y_sexo/       # Datos de población (52 CSV)
-├── 📂 notebooks/                    # Jupyter notebooks
+├── 📂 data/                             # Processed data (generated)
+│   └── warehouse.duckdb                 # DuckDB database
+├── 📂 raw_data/                         # Raw data sources
+│   ├── 📂 despoblamiento/               # Depopulation data (4 CSV)
+│   ├── 📂 industria/                    # Industry data (44 Excel)
+│   └── 📂 pob_x_munic_y_sexo/           # Population data (52 CSV)
+├── 📂 notebooks/                        # Jupyter notebooks
 │   └── data_exploration.ipynb
-├── 📄 Dockerfile                    # Container del pipeline
-├── 📄 Dockerfile.airflow            # Container de Airflow
-├── 📄 docker-compose.yml            # Orquestación de servicios
-├── 📄 requirements.txt              # Dependencias Python
-├── 📄 .env                          # Variables de entorno (no versionado)
-├── 📄 .env.example                  # Variables de entorno ejemplo
-└── 📄 README.md                     # Este archivo
+├── 📄 Dockerfile                        # Pipeline container
+├── 📄 Dockerfile.airflow                # Airflow container
+├── 📄 docker-compose.yml                # Services orchestration
+├── 📄 requirements.txt                  # Python dependencies
+├── 📄 .env                              # Environment variables (not versioned)
+└── 📄 README.md                         # This file
 ```
 
-## 🚀 Inicio Rápido
+## 🚀 Quick Start
 
-### Prerrequisitos
+### Prerequisites
 
 - Python 3.11+
 - Docker & Docker Compose
 - Git
-- GitHub Copilot (recomendado para desarrollo asistido)
 
-### 1. Clonar y Configurar
+### 1. Clone and Configure
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/your-org/dataengineer.git
+# Clone the repository
+git clone https://github.com/mvargas-ds/dataengineer.git
 cd dataengineer
 
-# Crear entorno virtual
+# Create virtual environment
 python -m venv .venv
 .venv\Scripts\activate  # Windows
 source .venv/bin/activate  # Linux/Mac
 
-# Instalar dependencias
+# Install dependencies
 pip install -r requirements.txt
 
-# Configurar variables de entorno
+# Configure environment variables
 copy .env.example .env
-# Editar .env con tus credenciales
+# Edit .env with your credentials
 ```
 
-### 2. Ejecutar Pipeline Localmente
+### 2. Run Pipeline Locally
 
 ```bash
-# Ejecutar pipeline completo (usa DuckDB por defecto)
+# Run complete pipeline (uses DuckDB by default)
 python -m src.pipeline.main --target duckdb --log-level INFO
 
-# Ejecutar solo extracción
+# Run extraction only
 python -m src.pipeline.main --phase extract
 
-# Ejecutar solo transformación
+# Run transformation only
 python -m src.pipeline.main --phase transform
+
+# Load to Snowflake (requires credentials)
+python -m src.pipeline.main --target snowflake
 ```
 
-### 3. Ejecutar con Docker
+### 3. Run with Docker
 
 ```bash
-# Construir imagen
+# Build image
 docker build -t dataengineer-pipeline .
 
-# Ejecutar pipeline
+# Run pipeline
 docker run -v ${PWD}/data:/app/data dataengineer-pipeline
 
-# O con docker-compose (solo pipeline)
+# Or with docker-compose (pipeline only)
 docker-compose --profile pipeline up
 ```
 
-### 4. Ejecutar con Airflow
+### 4. Run with Airflow
 
 ```bash
-# Crear archivo .env con AIRFLOW_UID
+# Create .env file with AIRFLOW_UID
 echo "AIRFLOW_UID=50000" > .env
 
-# Inicializar Airflow (primera vez)
+# Initialize Airflow (first time)
 docker-compose --profile airflow up airflow-init
 
-# Iniciar todos los servicios de Airflow
+# Start all Airflow services
 docker-compose --profile airflow up -d
 
-# Acceder a Airflow UI
-# http://localhost:8081
-# Usuario: admin
-# Contraseña: admin
+# Access Airflow UI
+# URL: http://localhost:8081
+# User: admin
+# Password: admin
 
-# Ver logs
+# View logs
 docker-compose --profile airflow logs -f airflow-webserver
 
-# Detener servicios
+# Stop services
 docker-compose --profile airflow down
 ```
 
 ## 📊 Datasets
 
-### Despoblamiento (4 archivos CSV)
-Indicadores económicos y demográficos por provincia:
-- `despob_pob_actividad_activos_ipc_pib_2023_clusters.csv` - Datos con clustering
-- `despob_pob_actividad_ocupados_ipc_pib_2023_despobl_desc.csv` - Datos descriptivos
-- `Despoblamiento_tasaActividad_2023.csv` - Tasas de actividad
-- Indicadores: despoblamiento, población, tasas de actividad/empleo/paro, IPC, PIB
+### Depopulation (4 CSV files)
+Economic and demographic indicators by province:
+- `despob_pob_actividad_activos_ipc_pib_2023_clusters.csv` - Data with clustering
+- `despob_pob_actividad_ocupados_ipc_pib_2023_despobl_desc.csv` - Descriptive data
+- `Despoblamiento_tasaActividad_2023.csv` - Activity rates
+- Indicators: despopulation, population, activity/employment/unemployment rates, CPI, GDP
 
-### Población por Municipio (52 archivos CSV)
-Series temporales de población (1996-2023):
-- Código y nombre de provincia
-- Código y nombre de municipio
-- Población por sexo (Total, Hombres, Mujeres)
-- Datos históricos anuales
+### Population by Municipality (52 CSV files)
+Population time series (1996-2023):
+- Province code and name
+- Municipality code and name
+- Population by sex (Total, Male, Female)
+- Annual historical data
 
-### Industria (44 archivos Excel)
-Datos industriales por provincia (2019):
-- Un archivo Excel por cada provincia española
-- Información por sectores industriales
-- Métricas de empleo y producción
+### Industry (44 Excel files)
+Industrial data by province (2019):
+- One Excel file per Spanish province
+- Information by industrial sectors
+- Employment and production metrics
 
-## ⚙️ Configuración
+## ⚙️ Configuration
 
-### Variables de Entorno (.env)
+### Environment Variables (.env)
 
 ```bash
 # Airflow
 AIRFLOW_UID=50000
 
-# Base de datos local
+# Local database
 LOCAL_DB_PATH=./data/warehouse.duckdb
 
-# Snowflake (producción)
+# Snowflake (production)
 SNOWFLAKE_ACCOUNT=your_account
 SNOWFLAKE_USER=your_user
 SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_DATABASE=DATA_WAREHOUSE
+SNOWFLAKE_DATABASE=SPAIN_DATA
 SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 SNOWFLAKE_SCHEMA=PUBLIC
 SNOWFLAKE_ROLE=ACCOUNTADMIN
 
-# Google Cloud Platform (opcional)
+# Groq LLM (FREE - required for AI agent)
+GROQ_API_KEY=gsk_your_groq_api_key
+
+# Web Search (optional)
+TAVILY_API_KEY=tvly_your_tavily_key
+
+# Google Cloud Platform (optional)
 GCP_PROJECT_ID=your-project
 GCP_BUCKET_NAME=your-bucket
 GOOGLE_APPLICATION_CREDENTIALS=./credentials/gcp-sa.json
-
-# LLM APIs (opcional para chatbot)
-OPENAI_API_KEY=tu_api_key
-ANTHROPIC_API_KEY=tu_api_key
 ```
 
-### Cambiar destino de carga en Airflow
+### Change Load Target in Airflow
 
-En la UI de Airflow (Admin → Variables):
-- `target_warehouse`: `duckdb` o `snowflake`
-- `enable_gcp_export`: `true` o `false`
+In Airflow UI (Admin → Variables):
+- `target_warehouse`: `duckdb` or `snowflake`
+- `enable_gcp_export`: `true` or `false`
 
 ## 🔄 Pipeline DAG (Airflow)
 
 ```
 start
   │
-  ├──► extract_despoblamiento ──┬──► transform_despoblamiento ──┐
-  ├──► extract_poblacion ───────┼──► transform_poblacion ───────┼──► load_to_warehouse
-  └──► extract_industria ───────┴──► transform_industria ───────┘          │
-                                                                           ▼
-                                                                    export_to_gcp
-                                                                           │
-                                                                           ▼
-                                                                    quality_check
-                                                                           │
-                                                                           ▼
-                                                                   send_notification
-                                                                           │
-                                                                           ▼
-                                                                          end
+  ├──► extract_depopulation ──┬──► transform_depopulation ──┐
+  ├──► extract_population ────┼──► transform_population ────┼──► load_to_warehouse
+  └──► extract_industry ──────┴──► transform_industry ──────┘          │
+                                                                       ▼
+                                                                export_to_gcp
+                                                                       │
+                                                                       ▼
+                                                                quality_check
+                                                                       │
+                                                                       ▼
+                                                               send_notification
+                                                                       │
+                                                                       ▼
+                                                                      end
 ```
 
 ## 🧪 Testing
 
 ```bash
-# Ejecutar todos los tests
+# Run all tests
 pytest tests/ -v
 
-# Con cobertura
+# With coverage
 pytest tests/ -v --cov=src --cov-report=html
 
-# Tests específicos
+# Specific tests
 pytest tests/test_pipeline.py::TestExtractors -v
 ```
 
-## 🤖 Desarrollo con GitHub Copilot
+---
 
-Este proyecto utiliza **GitHub Copilot** como asistente de IA para:
+## 🤖 AI Agent: Depopulation Analysis
 
-- Generación de código ETL
-- Consultas SQL y Text-to-SQL
-- Debugging y optimización
-- Documentación automática
+### Overview
 
-### Configuración recomendada en VS Code / PyCharm:
-1. Instalar extensión GitHub Copilot
-2. Autenticarse con cuenta GitHub
-3. Usar Copilot Chat para consultas sobre el código
+The project includes an **AI Agent** powered by **LangGraph + Groq** that can answer complex questions about rural depopulation in Spain ("España Vaciada").
+
+**Depopulation Threshold:** Municipalities with **< 2,000 inhabitants**
+
+**Target Users:**
+- 🏛️ Government officials and policymakers
+- 🎓 University professors and researchers
+- 📖 Master's and PhD students
+- 🏙️ Urban planners (smart cities, repopulation strategies)
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-tool Reasoning** | Queries Snowflake, INE, academic papers, web |
+| **Conversational Memory** | Remembers context for follow-up questions |
+| **Expert Analysis** | Explains correlations, factors, and trends |
+| **Bilingual** | Responds in Spanish or English |
+| **Multiple LLM Models** | Qwen3-32B, Llama 3.1, Llama 3.3 70B |
+
+### Quick Start - AI Agent
+
+```bash
+# 1. Get your FREE Groq API key at: https://console.groq.com/
+
+# 2. Add to .env file
+GROQ_API_KEY=gsk_your_key_here
+SNOWFLAKE_ACCOUNT=your_account
+SNOWFLAKE_USER=your_user
+SNOWFLAKE_PASSWORD=your_password
+SNOWFLAKE_DATABASE=SPAIN_DATA
+
+# 3. Run the agent in interactive mode
+python -m src.analytics.agents.depopulation_agent
+
+# 4. Or use the REST API
+uvicorn src.api.main:app --reload --port 8000
+```
+
+### Example Questions
+
+```
+👤 How many depopulated municipalities are there in Spain?
+👤 Which provinces have the highest depopulation rates?
+👤 What factors contribute to rural depopulation in Teruel?
+👤 Compare population trends between 2003 and 2023
+👤 What strategies can help repopulate rural areas?
+👤 Are there academic papers about "España vaciada"?
+👤 Show me the relationship between unemployment and depopulation
+```
+
+### Available Tools
+
+| Tool | Purpose |
+|------|---------|
+| `snowflake_tool` | Query population, economic, and industrial data from Snowflake |
+| `ine_tool` | Fetch live data from INE (official Spanish statistics) |
+| `web_search_tool` | Search news, reports, government documents |
+| `analysis_tool` | Expert analysis on depopulation factors and correlations |
+
+### Agent Architecture
+
+```
+User Question
+     │
+     ▼
+┌─────────────────────────────────────────┐
+│           LangGraph Agent               │
+│  ┌─────────────────────────────────┐   │
+│  │         Router Node             │   │
+│  │   Analyzes question type        │   │
+│  └─────────────┬───────────────────┘   │
+│                │                        │
+│    ┌───────────┼───────────┐           │
+│    ▼           ▼           ▼           │
+│ ┌──────┐  ┌──────┐  ┌──────────┐       │
+│ │ SQL  │  │ INE  │  │ Web/     │       │
+│ │ Tool │  │ Tool │  │ Scholar  │       │
+│ └──────┘  └──────┘  └──────────┘       │
+│    │           │           │           │
+│    └───────────┼───────────┘           │
+│                ▼                        │
+│  ┌─────────────────────────────────┐   │
+│  │    Synthesis Node (Groq LLM)    │   │
+│  │    Combines results + insights  │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+     │
+     ▼
+  Response
+```
 
 ---
 
-## 🔍 Herramientas de Análisis de Datos
+## 🔍 Data Analysis Tools
 
-### 1. Chatbot con IA (Text-to-SQL)
-
-Permite hacer consultas en **lenguaje natural** sobre los datos:
-
-```bash
-# Modo interactivo (sin LLM - usa plantillas)
-python -m src.analytics.chatbot
-
-# Con OpenAI GPT-4
-export OPENAI_API_KEY=tu_api_key
-python -m src.analytics.chatbot --provider openai
-
-# Con Anthropic Claude
-export ANTHROPIC_API_KEY=tu_api_key
-python -m src.analytics.chatbot --provider anthropic
-```
-
-**Ejemplos de preguntas:**
-- "¿Cuáles son las provincias más despobladas?"
-- "¿Cuántos habitantes tiene cada provincia?"
-- "¿Qué sectores industriales tienen más empleo?"
-
-### 2. Dashboard Interactivo (Streamlit)
-
-```bash
-streamlit run src/dashboard/app.py
-```
-
-Accede a `http://localhost:8501` para explorar visualizaciones interactivas.
-
-### 3. API REST (FastAPI)
+### 1. REST API (FastAPI)
 
 ```bash
 uvicorn src.api.main:app --reload --port 8000
 ```
 
 **Endpoints:**
-- `GET /tables` - Lista de tablas
-- `POST /query` - Ejecutar SQL
-- `GET /analytics/despoblamiento` - Análisis de despoblamiento
-- `GET /analytics/poblacion` - Análisis de población
+- `GET /tables` - List of tables
+- `POST /query` - Execute SQL
+- `GET /analytics/depopulation` - Depopulation analysis
+- `GET /analytics/population` - Population analysis
 
-Documentación Swagger en `http://localhost:8000/docs`
+Swagger documentation at `http://localhost:8000/docs`
 
-### 4. Consultas SQL Directas
+### 2. Text-to-SQL Chatbot
+
+```bash
+# Interactive mode (template-based, no LLM)
+python -m src.analytics.chatbot
+
+# With OpenAI GPT-4
+export OPENAI_API_KEY=your_api_key
+python -m src.analytics.chatbot --provider openai
+
+# With Anthropic Claude
+export ANTHROPIC_API_KEY=your_api_key
+python -m src.analytics.chatbot --provider anthropic
+```
+
+### 3. Direct SQL Queries
 
 ```python
 import duckdb
 
 conn = duckdb.connect('./data/warehouse.duckdb', read_only=True)
 
-# Consulta de ejemplo
+# Example query
 df = conn.execute("""
     SELECT nombre_provincia, SUM(total) as poblacion
     FROM fact_poblacion
@@ -355,54 +467,73 @@ conn.close()
 
 ---
 
-## 📈 Monitoreo
+## 📈 Monitoring
 
-### Métricas del Pipeline
+### Pipeline Metrics
 
-- Filas extraídas por fuente
-- Filas transformadas
-- Filas cargadas exitosamente
-- Tiempo de ejecución por fase
-- Reportes de calidad de datos
+- Rows extracted per source
+- Rows transformed
+- Rows loaded successfully
+- Execution time per phase
+- Data quality reports
 
 ### Health Checks
 
 ```bash
-# Verificar estado de servicios
+# Check service status
 docker-compose --profile airflow ps
 
-# Ver logs del webserver
+# View webserver logs
 docker-compose --profile airflow logs airflow-webserver
 ```
 
-## 🐳 Puertos de Servicios
+## 🐳 Service Ports
 
-| Servicio | Puerto | URL |
-|----------|--------|-----|
+| Service | Port | URL |
+|---------|------|-----|
 | Airflow UI | 8081 | http://localhost:8081 |
-| Streamlit Dashboard | 8501 | http://localhost:8501 |
 | FastAPI | 8000 | http://localhost:8000 |
-
-## 🤝 Contribuir
-
-1. Fork el repositorio
-2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit cambios (`git commit -m 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abrir Pull Request
-
-## 📄 Licencia
-
-MIT License - ver [LICENSE](LICENSE) para detalles.
 
 ---
 
-## 👥 Autores
+## 🤖 Development with GitHub Copilot
+
+This project uses **GitHub Copilot** as an AI assistant for:
+
+- ETL code generation
+- SQL queries and Text-to-SQL
+- Debugging and optimization
+- Automatic documentation
+
+### Recommended Setup in VS Code / PyCharm:
+1. Install GitHub Copilot extension
+2. Authenticate with GitHub account
+3. Use Copilot Chat for code queries
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/new-functionality`)
+3. Commit changes (`git commit -m 'Add new functionality'`)
+4. Push to branch (`git push origin feature/new-functionality`)
+5. Open Pull Request
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 👥 Authors
 
 - Data Engineering Team
+- GitHub: [@mvargas-ds](https://github.com/mvargas-ds)
 
-## 🙏 Agradecimientos
+## 🙏 Acknowledgments
 
-- Instituto Nacional de Estadística (INE) por los datos
-- Apache Airflow y DuckDB communities
-- GitHub Copilot por la asistencia en desarrollo
+- Instituto Nacional de Estadística (INE) for the data
+- Apache Airflow, DuckDB, Snowflake, LangChain communities
+- Groq for free LLM inference
+- GitHub Copilot for development assistance
