@@ -106,6 +106,8 @@ dmypy.json
 
 # Datos procesados y bases de datos locales
 data/
+raw_data/
+airflow/logs/
 *.duckdb
 *.duckdb.wal
 *.db
@@ -164,4 +166,5 @@ $RECYCLE.BIN/
 .directory
 .Trash-*
 .nfs*
+
 
