@@ -37,6 +37,7 @@ class AgentState(TypedDict):
     messages: Annotated[List, "The messages in the conversation"]
     context: Dict[str, Any]  # Extracted context
     tool_results: List[str]  # Results from tool calls
+    iterations: int  # Number of agent iterations
     final_answer: Optional[str]  # The final synthesized answer
 
 
@@ -54,8 +55,10 @@ class DepopulationAgent:
         self,
         groq_api_key: Optional[str] = None,
         model: str = "qwen/qwen3-32b",
-        temperature: float = 0.1
+        temperature: float = 0.1,
+        max_iterations: int = 3
     ):
+        self.max_iterations = max_iterations
         """
         Initialize the depopulation analysis agent.
 
@@ -134,6 +137,9 @@ class DepopulationAgent:
     def _agent_node(self, state: AgentState) -> AgentState:
         """Main agent reasoning node."""
         messages = state["messages"]
+        iterations = state.get("iterations", 0) + 1
+
+        logger.debug(f"Agent iteration: {iterations}/{self.max_iterations}")
 
         # Add system prompt if not present
         if not messages or not isinstance(messages[0], SystemMessage):
@@ -144,11 +150,17 @@ class DepopulationAgent:
         response = self.llm_with_tools.invoke(messages)
 
         # Add response to messages
-        return {"messages": messages + [response]}
+        return {"messages": messages + [response], "iterations": iterations}
 
     def _should_continue(self, state: AgentState) -> str:
         """Decide whether to continue with tools or synthesize."""
         last_message = state["messages"][-1]
+        iterations = state.get("iterations", 0)
+
+        # Check if max iterations reached
+        if iterations >= self.max_iterations:
+            logger.warning(f"Max iterations ({self.max_iterations}) reached. Forcing synthesis.")
+            return "end"
 
         # If there are tool calls, continue
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
@@ -191,6 +203,7 @@ class DepopulationAgent:
             "messages": [HumanMessage(content=message)],
             "context": self.memory.get_context(),
             "tool_results": [],
+            "iterations": 0,
             "final_answer": None
         }
 

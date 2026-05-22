@@ -9,7 +9,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 
-
+#graph state: state is an object, it goes through all the nodes, it's the agent memory
 class AgentState(TypedDict):
     """
     State schema for the depopulation analysis agent.
