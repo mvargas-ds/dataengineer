@@ -20,15 +20,15 @@ def check_github_token():
     token = os.getenv("GITHUB_TOKEN")
     
     print("=" * 60)
-    print("🔧 CONFIGURACIÓN DE GITHUB MODELS")
+    print("🔧  GITHUB MODELS CONFIGURATION")
     print("=" * 60)
     
     if token and token != "your_github_token_here":
-        print("\n✅ GITHUB_TOKEN está configurado")
+        print("\n✅ GITHUB_TOKEN is configured correctly!")
         print(f"   Token: {token[:10]}...{token[-4:]}")
         
         # Intentar una llamada de prueba
-        print("\n🧪 Probando conexión con GitHub Models...")
+        print("\n🧪 Testing GitHub Models connection...")
         try:
             from openai import OpenAI
             
@@ -39,25 +39,25 @@ def check_github_token():
             
             response = client.chat.completions.create(
                 model="gpt-4o-mini",  # Modelo más ligero para prueba
-                messages=[{"role": "user", "content": "Di 'Hola' en español"}],
+                messages=[{"role": "user", "content": "Say 'Hello' in English"}],
                 max_tokens=10
             )
             
-            print(f"   ✅ ¡Conexión exitosa!")
-            print(f"   Respuesta: {response.choices[0].message.content}")
-            print("\n🎉 ¡Todo listo! Puedes usar el chatbot con:")
+            print(f"   ✅ ¡Sucessfull connection!")
+            print(f"   Answer: {response.choices[0].message.content}")
+            print("\n🎉 ¡Everything ready! Can use chatbot with:")
             print("   python -m src.analytics.chatbot --provider github")
             return True
             
         except Exception as e:
-            print(f"   ❌ Error de conexión: {e}")
-            print("\n   Posibles causas:")
-            print("   1. Token inválido o expirado")
-            print("   2. No tienes acceso a GitHub Models")
-            print("   3. Problemas de red")
+            print(f"   ❌ Connection error: {e}")
+            print("\n   Root causes:")
+            print("   1. Invalid or expired token")
+            print("   2. You don't have acces to GitHub Models")
+            print("   3. Network issues")
             return False
     else:
-        print("\n❌ GITHUB_TOKEN no está configurado")
+        print("\n❌ GITHUB_TOKEN is not configure")
         print_setup_instructions()
         return False
 
@@ -133,7 +133,7 @@ def list_available_models():
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 
-💡 El chatbot usa 'gpt-4o' por defecto para mejor calidad.
+💡 Chatbot use 'gpt-4o' by default for better quality.
 """)
 
 
@@ -146,4 +146,3 @@ if __name__ == "__main__":
         check_github_token()
         print()
         list_available_models()
-

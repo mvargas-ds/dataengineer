@@ -5,7 +5,6 @@ This DAG orchestrates the complete ETL flow:
 1. Data extraction from local sources
 2. Data transformation and cleaning
 3. Load to DuckDB (local) or Snowflake (production)
-4. Export to GCP for Vertex AI (optional)
 
 Similar to the described project:
 - Extracts data from sources
@@ -140,7 +139,6 @@ def transform_industria(**context):
     
     return output_path
 
-
 def load_to_warehouse(**context):
     """Task: Load all data to warehouse."""
     import pandas as pd
@@ -164,31 +162,6 @@ def load_to_warehouse(**context):
     context['ti'].xcom_push(key='load_results', value=results)
     
     return results
-
-
-def export_to_gcp(**context):
-    """Task: Export data to GCP for Vertex AI."""
-    import pandas as pd
-    from src.etl.loaders import GCSLoader
-    
-    if not ENABLE_GCP_EXPORT:
-        print("GCP export disabled")
-        return
-    
-    loader = GCSLoader()
-    
-    # Load transformed data
-    despoblamiento_path = context['ti'].xcom_pull(task_ids='transformation.transform_despoblamiento')
-    poblacion_path = context['ti'].xcom_pull(task_ids='transformation.transform_poblacion')
-    industria_path = context['ti'].xcom_pull(task_ids='transformation.transform_industria')
-    
-    # Export in JSONL format for Vertex AI Datastore
-    loader.load(pd.read_parquet(despoblamiento_path), 'despoblamiento', format='jsonl')
-    loader.load(pd.read_parquet(poblacion_path), 'poblacion', format='jsonl')
-    loader.load(pd.read_parquet(industria_path), 'industria', format='jsonl')
-    
-    return "Export to GCP completed"
-
 
 def quality_check(**context):
     """Task: Verify loaded data quality."""

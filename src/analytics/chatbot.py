@@ -10,7 +10,6 @@ This is a very common pattern in modern Data Science projects:
 
 Supports multiple backends:
 - OpenAI GPT-4
-- Anthropic Claude
 - Local LLMs (Ollama)
 - No-LLM mode (predefined templates)
 """
@@ -45,42 +44,101 @@ class DataChatbot:
     Converts natural language questions to SQL queries.
     """
     
-    def __init__(self, db_path: str = None, llm_provider: str = "template"):
+    def __init__(self, db_path: str = None, llm_provider: str = "template", database_type: str = "duckdb"):
+
+        print("--------------      INIT    ----------------")
         """
         Initializes the chatbot.
 
         Args:
             db_path: Path to DuckDB database
             llm_provider: 'github', 'openai', 'anthropic', 'ollama', 'template'
+            database_type: 'duckdb' or 'snowflake'
         """
-        self.db_path = db_path or str(DB_PATH)
-        self.conn = duckdb.connect(self.db_path, read_only=True)
+        self.database_type = database_type
         self.llm_provider = llm_provider
         self.conversation_history: List[ChatMessage] = []
+        self.db_path = None
+
+        if database_type == "snowflake":
+            self._connect_snowflake()
+        else:
+            self.db_path = db_path or str(DB_PATH)
+            self.conn = duckdb.connect(self.db_path, read_only=True)
+
         self.schema_info = self._get_schema_info()
         
         print("🤖 Data Analysis Chatbot Initialized")
         print(f"📊 Database: {self.db_path}")
         print(f"🧠 LLM Provider: {llm_provider}")
         self._print_available_data()
+
+    def _connect_snowflake(self):
+        print("--------------      CONNECT SNOWFLAKE    ----------------")
+        """Connects to Snowflake."""
+        import snowflake.connector
+        from dotenv import load_dotenv
+
+        load_dotenv()
+
+        account = os.getenv('SNOWFLAKE_ACCOUNT', 'fj69748.sa-east-1.aws')
+        user = os.getenv('SNOWFLAKE_USER')
+        password = os.getenv('SNOWFLAKE_PASSWORD')
+        warehouse = os.getenv('SNOWFLAKE_WAREHOUSE')
+        database = os.getenv('SNOWFLAKE_DATABASE')
+        schema = os.getenv('SNOWFLAKE_SCHEMA', 'PUBLIC')
+
+        self.conn = snowflake.connector.connect(
+            account=account,
+            user=user,
+            password=password,
+            warehouse=warehouse,
+            database=database,
+            schema=schema
+        )
+        print(f"❄️ Connected to Snowflake: {database}.{schema}")
     
     def _get_schema_info(self) -> Dict:
+        print("--------------      GET SCHEMA INFO    ----------------")
         """Gets database schema information."""
-        tables = self.conn.execute("SHOW TABLES").fetchall()
         schema = {}
-        
-        for table in tables:
-            table_name = table[0]
-            columns = self.conn.execute(f"DESCRIBE {table_name}").fetchdf()
-            sample = self.conn.execute(f"SELECT * FROM {table_name} LIMIT 3").fetchdf()
-            count = self.conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-            
-            schema[table_name] = {
-                'columns': columns.to_dict('records'),
-                'sample_data': sample.to_dict('records'),
-                'row_count': count
-            }
-        
+        if self.database_type == "snowflake":
+            cursor = self.conn.cursor()
+            cursor.execute("SHOW TABLES")
+            tables = [(row[1],) for row in cursor.fetchall()]
+
+            for table in tables:
+                table_name = table[0]
+                cursor.execute(f"DESCRIBE TABLE {table_name}")
+                columns = [{"column_name": row[0], "column_type": row[1]} for row in cursor.fetchall()]
+                cursor.execute(f"SELECT * FROM {table_name} LIMIT 3")
+                sample = cursor.fetchall()
+                col_names = [desc[0] for desc in cursor.description]
+                sample_data = [dict(zip(col_names, row)) for row in sample]
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                count = cursor.fetchone()[0]
+
+                schema[table_name] = {
+                    'columns': columns,
+                    'sample_data': sample_data,
+                    'row_count': count
+                }
+            cursor.close()
+        else:
+            # DuckDB original logic
+            tables = self.conn.execute("SHOW TABLES").fetchall()
+            for table in tables:
+                table_name = table[0]
+                columns = self.conn.execute(f"DESCRIBE {table_name}").fetchdf()
+                sample = self.conn.execute(f"SELECT * FROM {table_name} LIMIT 3").fetchdf()
+                count = self.conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+
+                schema[table_name] = {
+                    'columns': columns.to_dict('records'),
+                    'sample_data': sample.to_dict('records'),
+                    'row_count': count
+                }
+
         return schema
     
     def _print_available_data(self):
@@ -93,12 +151,22 @@ class DataChatbot:
         print()
     
     def _build_system_prompt(self) -> str:
+        print("--------------      BUILD SYSTEM PROMPT    ----------------")
         """Builds the system prompt with data context."""
         schema_text = ""
         for table, info in self.schema_info.items():
             cols = ", ".join([f"{c['column_name']} ({c['column_type']})" 
                             for c in info['columns']])
             schema_text += f"\nTable: {table}\n  Columns: {cols}\n  Rows: {info['row_count']}\n"
+
+        db_note = ""
+        if self.database_type == "snowflake":
+            db_note = """
+        ⚠️ CRITICAL: Use EXACTLY these column names (case-sensitive in Snowflake):
+        - CODIGO_PROVINCIA (NOT CODIGO_PROVINCIO)
+        - NOMBRE_PROVINCIA
+        - Use uppercase for all column and table names in Snowflake
+        """
 
         return f"""You are an expert data analysis assistant for Spain data.
 You have access to a DuckDB database with the following data:
@@ -560,13 +628,27 @@ What would you like to know?""", None
     def _execute_sql(self, sql: str) -> Tuple[bool, str]:
         """Executes a SQL query and returns formatted result."""
         try:
-            df = self.conn.execute(sql).fetchdf()
-            if len(df) == 0:
-                return True, "The query returned no results."
+            if self.database_type == "snowflake":
+                cursor = self.conn.cursor()
+                cursor.execute(sql)
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                cursor.close()
 
-            # Format result
-            result = df.to_string(index=False)
-            return True, f"\n📊 Results ({len(df)} rows):\n\n{result}"
+                if len(rows) == 0:
+                    return True, "The query returned no results."
+
+                # Format as simple table
+                import pandas as pd
+                df = pd.DataFrame(rows, columns=columns)
+                result = df.to_string(index=False)
+                return True, f"\n📊 Results ({len(df)} rows):\n\n{result}"
+            else:
+                df = self.conn.execute(sql).fetchdf()
+                if len(df) == 0:
+                    return True, "The query returned no results."
+                result = df.to_string(index=False)
+                return True, f"\n📊 Results ({len(df)} rows):\n\n{result}"
         except Exception as e:
             return False, f"Error executing SQL: {e}"
 
@@ -610,6 +692,7 @@ What would you like to know?""", None
         return final_response
     
     def run_interactive(self):
+        print("--------------      RUN INTERACTIVE    ----------------")
         """Runs the chatbot in interactive mode."""
         print("\n" + "="*70)
         print("🤖 DATA ANALYSIS CHATBOT - SPAIN")
@@ -713,8 +796,14 @@ def main():
     parser.add_argument(
         "--provider", 
         choices=["github", "openai", "anthropic", "ollama", "template"],
-        default="template",
+        default="openai",
         help="LLM provider (default: template)"
+    )
+    parser.add_argument(
+        "--database",
+        choices=["duckdb", "snowflake"],
+        default="duckdb",
+        help="Database to query (default: duckdb)"
     )
     parser.add_argument(
         "--query",
@@ -724,7 +813,7 @@ def main():
     
     args = parser.parse_args()
     
-    chatbot = DataChatbot(llm_provider=args.provider)
+    chatbot = DataChatbot(llm_provider=args.provider, database_type=args.database)
     
     if args.query:
         response = chatbot.chat(args.query)
@@ -737,4 +826,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

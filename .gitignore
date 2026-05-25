@@ -110,6 +110,7 @@ data/
 *.duckdb.wal
 *.db
 *.sqlite
+raw_data/
 
 # Logs
 logs/

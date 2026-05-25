@@ -39,39 +39,17 @@ class DespoblamientoExtractor(BaseExtractor):
     
     def extract(self) -> pd.DataFrame:
         """Extracts all CSV files from depopulation folder."""
-        all_data = []
-        csv_files = list(self.source_path.glob("*.csv"))
-        
-        logger.info(f"Found {len(csv_files)} CSV files for depopulation")
+        main_file = self.source_path / "despob_pob_actividad_activos_ipc_pib_2023_clusters.csv"
 
-        for file_path in csv_files:
-            try:
-                # Files use semicolon as separator
-                df = pd.read_csv(file_path, sep=';', encoding='utf-8')
-                df['source_file'] = file_path.name
-                all_data.append(df)
-                logger.debug(f"Extracted: {file_path.name} - {len(df)} rows")
-            except Exception as e:
-                logger.error(f"Error extracting {file_path.name}: {e}")
-
-        if all_data:
-            combined_df = pd.concat(all_data, ignore_index=True)
-            self.validate(combined_df)
-            return combined_df
-        
-        return pd.DataFrame()
-    
-    def extract_main_dataset(self) -> pd.DataFrame:
-        """Extracts the main depopulation dataset with economic indicators."""
-        main_file = self.source_path / "despob_pob_actividad_activos_ipc_pib_2023 - copia.csv"
-        
         if main_file.exists():
             df = pd.read_csv(main_file, sep=';', encoding='utf-8')
-            logger.info(f"Main dataset extracted: {len(df)} rows")
+            df['source_file'] = main_file.name
+            logger.info(f"Extracted: {main_file.name} - {len(df)} rows")
+            self.validate(df)
             return df
-        else:
-            logger.warning(f"Main file not found: {main_file}")
-            return pd.DataFrame()
+
+        logger.warning(f"Main file not found: {main_file}")
+        return pd.DataFrame()
 
 
 class PoblacionExtractor(BaseExtractor):

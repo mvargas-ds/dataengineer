@@ -450,4 +450,3 @@ if __name__ == "__main__":
         info = loader.get_table_info(f"fact_{table_name}")
         print(f"  {table_name}: {info}")
     loader.close()
-

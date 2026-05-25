@@ -17,19 +17,19 @@ class AnalyticsEngine:
     def __init__(self, db_path: str = None):
         self.db_path = db_path or str(DB_PATH)
         self.conn = duckdb.connect(self.db_path, read_only=True)
-        print(f"✅ Conectado a: {self.db_path}")
+        print(f"✅ Connected to: {self.db_path}")
         self._show_tables()
     
     def _show_tables(self):
         """Muestra las tablas disponibles."""
         tables = self.conn.execute("SHOW TABLES").fetchall()
-        print(f"📊 Tablas disponibles: {[t[0] for t in tables]}")
+        print(f"📊 Available tables: {[t[0] for t in tables]}")
     
     def query(self, sql: str) -> pd.DataFrame:
         """Ejecuta una consulta SQL y retorna DataFrame."""
         return self.conn.execute(sql).fetchdf()
     
-    def print_query(self, sql: str, title: str = "Resultado"):
+    def print_query(self, sql: str, title: str = "Result"):
         """Ejecuta y muestra una consulta con formato."""
         print(f"\n{'='*60}")
         print(f"📈 {title}")
@@ -38,7 +38,7 @@ class AnalyticsEngine:
         print("-"*60)
         df = self.query(sql)
         print(tabulate(df.head(15), headers='keys', tablefmt='psql', showindex=False))
-        print(f"\nTotal filas: {len(df)}")
+        print(f"\nRows numbers: {len(df)}")
         return df
     
     def close(self):
@@ -54,7 +54,7 @@ def run_analytics_examples():
     # =========================================================================
     # 1. RESUMEN GENERAL DEL WAREHOUSE
     # =========================================================================
-    print("\n" + "🏠 RESUMEN DEL DATA WAREHOUSE ".center(60, "="))
+    print("\n" + "🏠 DATA WAREHOUSE SUMMARIZE".center(60, "="))
     
     engine.print_query("""
         SELECT 
@@ -65,18 +65,18 @@ def run_analytics_examples():
         SELECT 'fact_poblacion', COUNT(*) FROM fact_poblacion
         UNION ALL
         SELECT 'fact_industria', COUNT(*) FROM fact_industria
-    """, "Conteo de Registros por Tabla")
+    """, "Record Count per Table")
     
     # =========================================================================
     # 2. ANÁLISIS DE DESPOBLAMIENTO
     # =========================================================================
-    print("\n" + "📉 ANÁLISIS DE DESPOBLAMIENTO ".center(60, "="))
+    print("\n" + "📉 DEPOPULATION ANALISIS ".center(60, "="))
     
     engine.print_query("""
         SELECT 
             categoria_despoblamiento,
             COUNT(*) as provincias,
-            ROUND(AVG(poblacion_total), 0) as poblacion_promedio,
+            FORMAT('{:,.0f}', AVG(poblacion_total)) as poblacion_promedio,
             ROUND(AVG(tasa_paro_total), 2) as tasa_paro_promedio,
             ROUND(AVG(pib_precios_corrientes), 0) as pib_promedio
         FROM fact_despoblamiento
@@ -89,10 +89,11 @@ def run_analytics_examples():
                 WHEN 'Alto' THEN 3 
                 WHEN 'Muy Alto' THEN 4 
             END
-    """, "Indicadores por Nivel de Despoblamiento")
+    """, "Indicators by Level of Depopulation")
     
     engine.print_query("""
-        SELECT 
+        SELECT
+            nombre_provincia,
             ROUND(porcentaje_despoblamiento, 1) as pct_despoblamiento,
             poblacion_total,
             ROUND(tasa_actividad_total, 2) as tasa_actividad,
@@ -103,12 +104,12 @@ def run_analytics_examples():
         WHERE porcentaje_despoblamiento IS NOT NULL
         ORDER BY porcentaje_despoblamiento DESC
         LIMIT 10
-    """, "Top 10 - Mayor Despoblamiento")
+    """, "Top 10 - Highest Depopulation")
     
     # =========================================================================
     # 3. ANÁLISIS DE POBLACIÓN
     # =========================================================================
-    print("\n" + "👥 ANÁLISIS DE POBLACIÓN ".center(60, "="))
+    print("\n" + "👥 POPULATION ANALISIS ".center(60, "="))
     
     engine.print_query("""
         SELECT 
@@ -122,7 +123,7 @@ def run_analytics_examples():
         GROUP BY nombre_provincia, periodo
         ORDER BY poblacion_total DESC
         LIMIT 10
-    """, "Top 10 Provincias por Población (2023)")
+    """, "Top 10 Provinces by Population (2023)")
     
     engine.print_query("""
         SELECT 
@@ -133,7 +134,7 @@ def run_analytics_examples():
         WHERE sexo = 'Total' AND periodo >= 2010
         GROUP BY periodo
         ORDER BY periodo DESC
-    """, "Evolución de Población Total por Año")
+    """, "Evolution of Total Population by Year")
     
     engine.print_query("""
         SELECT 
@@ -152,12 +153,12 @@ def run_analytics_examples():
         HAVING MAX(CASE WHEN periodo = 2010 THEN total END) > 10000
         ORDER BY variacion_pct DESC
         LIMIT 10
-    """, "Municipios con Mayor Crecimiento (2010-2023)")
+    """, "Municipalities with the Highest Growth (2010-2023)")
     
     # =========================================================================
     # 4. ANÁLISIS DE INDUSTRIA
     # =========================================================================
-    print("\n" + "🏭 ANÁLISIS DE INDUSTRIA ".center(60, "="))
+    print("\n" + "🏭 INDUSTRY ANALISIS ".center(60, "="))
     
     engine.print_query("""
         SELECT 
@@ -170,25 +171,25 @@ def run_analytics_examples():
         GROUP BY provincia
         ORDER BY pib_total DESC
         LIMIT 10
-    """, "Top 10 Provincias por PIB Industrial")
+    """, "Top 10 Provinces by Industrial GDP (PBI Producto bruto interno")
     
     engine.print_query("""
         SELECT 
-            aaee_seccin_cnae09 as sector,
+            aaee_seccion_cnae09 as sector,
             COUNT(*) as num_registros,
             ROUND(SUM(vab_corregido_2016), 0) as vab_total,
             ROUND(SUM(afiliados_diciembre_de_2016), 0) as total_afiliados
         FROM fact_industria
-        WHERE aaee_seccin_cnae09 IS NOT NULL
-        GROUP BY aaee_seccin_cnae09
+        WHERE aaee_seccion_cnae09 IS NOT NULL
+        GROUP BY aaee_seccion_cnae09
         ORDER BY vab_total DESC
         LIMIT 10
-    """, "Top Sectores por Valor Añadido Bruto")
+    """, "Top Sectors by Gross Value Added")
     
     # =========================================================================
     # 5. ANÁLISIS CRUZADO
     # =========================================================================
-    print("\n" + "🔗 ANÁLISIS CRUZADO ".center(60, "="))
+    print("\n" + "🔗 CROSS ANALISIS ".center(60, "="))
     
     engine.print_query("""
         WITH industria_prov AS (
@@ -208,10 +209,10 @@ def run_analytics_examples():
         FROM fact_despoblamiento d
         WHERE d.categoria_despoblamiento IS NOT NULL
         GROUP BY d.categoria_despoblamiento
-    """, "Relación Despoblamiento - Indicadores Económicos")
+    """, "Relationship between Depopulation and Economic Indicators")
     
     engine.close()
-    print("\n" + "✅ ANÁLISIS COMPLETADO ".center(60, "="))
+    print("\n" + "✅ COMPLETED ANALISIS ".center(60, "="))
 
 
 if __name__ == "__main__":
@@ -224,4 +225,3 @@ if __name__ == "__main__":
         from tabulate import tabulate
     
     run_analytics_examples()
-

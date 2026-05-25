@@ -32,13 +32,16 @@ class BaseTransformer:
     
     def clean_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
         """Cleans and normalizes column names."""
-        df.columns = (
-            df.columns
-            .str.lower()
-            .str.strip()
-            .str.replace(' ', '_')
-            .str.replace(r'[^\w]', '', regex=True)
-        )
+        import unicodedata
+        def normalize_name(name):
+            # Eliminar tildes/acentos
+            name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('ASCII')
+            # Minúsculas, espacios a guiones bajos, eliminar caracteres especiales
+            name = name.lower().strip().replace(' ', '_')
+            name = ''.join(c if c.isalnum() or c == '_' else '' for c in name)
+            return name
+
+        df.columns = [normalize_name(col) for col in df.columns]
         self.log_transformation('clean_column_names', f'Normalized columns: {list(df.columns)}')
         return df
     
@@ -90,6 +93,8 @@ class DespoblamientoTransformer(BaseTransformer):
         
         # Rename columns for clarity
         column_mapping = {
+            'cod_prov': 'codigo_provincia',
+            'nom_prov': 'nombre_provincia',
             'porcen_desp': 'porcentaje_despoblamiento',
             'pob_tot': 'poblacion_total',
             'pob_hom': 'poblacion_hombres',
@@ -319,4 +324,3 @@ if __name__ == "__main__":
         print(f"\n{name} (transformed):")
         print(f"  - Rows: {len(df)}")
         print(f"  - Columns: {list(df.columns)[:5]}...")
-
